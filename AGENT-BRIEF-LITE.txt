@@ -1,0 +1,544 @@
+# AGENT-BRIEF — «الدفتر / Dafter» دفتر ديون البقالة الصوتي
+> ملف معرفة كامل لوكيل ذكاء اصطناعي يخلفني على المشروع. اقرأه كاملًا قبل أي تعديل. الحجم مستهدف ~200KB ليشمل الكود والحقوق والقرارات والتاريخ.
+
+## 1) ما هذا المشروع
+تطبيق ويب عربي (RTL، وإنجليزية اختيارية) لحفظ دفتر ديون بقالة/تموينات: تسجيل دين/سداد بالصوت (ضغط مطوّل) أو يدويًا (ضغطة واحدة)، عملاء بصور وأرشيف، كشوف وطباعة وQR وWhatsApp، حسابات متعددة، بلا إنترنت وبلا خادم — ملف HTML واحد + مكتبات محلية في lib/.
+المستخدم صاحب بقالة؛ اللغة الأساسية للعواجهة العربية. كل قرارات التصميم تُحترم كما دوّنتها في §4.
+
+## 2) التشغيل والفحص
+- معاينة: `python3 -m http.server 3000 --directory /home/user/dafter` ثم افتح index.html.
+- الاختبارات: `export NODE_PATH=/home/user/.pup/node_modules && cd tests && node rX_*.js` — كل ملف يطبع RESULT. البدلة الحالية 252/252 عبر 17 ملفًا.
+- بيئة الاختبار jsdom من /home/user/.pup؛ لقطات puppeteer في /home/user/shots.
+- فحوص إضافية: /home/user/.pup/axe.js (وصولية، الآن CLEAN كلها)، perf.js (تفاعل 1-4ms، بلا long tasks)، diag.js (كنسول/تداخل).
+
+## 3) بنية الملف الواحد
+- <head> + CSS (§10) + هيكل ثابت: #app، #tabbar، #actionrow (أزرار دين/سداد اللاصقة)، #sheetWrap/#sheet (الأوراق السفلية)، #toast.
+- مكتبات خارجية محلية: ['lib/qrcode.js', 'lib/jsQR.js', 'lib/chart.umd.js', 'lib/xlsx.full.min.js', 'lib/tesseract.min.js'] (qrcode، jsQR، chart، xlsx، tesseract — تُحمّل defer؛ إن غابت يتدهور التطبيق برفق).
+- <script> واحد (§11) يحوي كل المنطق. لا تقسم الملف ولا تضف بناءً/حزم — قرار مستخدم ثابت.
+
+## 4) قيود المستخدم الدائمة (لا تُكسر أبدًا)
+- الأزرار السفلية دين/سداد ثابتة: ضغطة=يدوي، مطوّلة≈380ms=صوتي. زر + الأوسط ثابت ويفتح (عميل يدوي / من جهات الاتصال) فقط.
+- ملف HTML واحد؛ لا تقسيم ملفات ولا Keystore/تحويل native الآن (مؤجل: إعادة تسمية، تقسيم، Keystore).
+- التطبيق لا يخترع بيانات: لا ديون ولا مواد تموينية من تلقاء نفسه؛ عند فشل الالتقاط نموذج فارغ + تحذير ولا حفظ بلا تأكيد.
+- الفلتر في الرئيسية ثلاثي مطوي (اليوم/الأسبوع/الشهر) كشارة صغيرة داخل صف «آخر العمليات».
+- شريط التحديد (إلغاء/تحديد الكل/مشاركة/أرشفة/حذف) مستطيل فوق العمليات تمامًا (نمط واتساب) وليس عائمًا أسفل.
+- واجهة الحسابات المنسدلة بلا خيار «شخصي» (مستقبلي؛ يُعرض الحساب الشخصي فقط إن كان نشطًا كي لا يُحبس المستخدم).
+- شاشة تأكيد التسجيل بلا زر «تعديل» — الحقول قابلة للتحرير مباشرة؛ وسطر «بيانات العميل لا تغادر جهازك» ظاهر.
+- قائمة ⋮: تحديد/استيراد(مخفي=مستقبلي)/تصدير/QR/… بلا «استيراد نص» ظاهر ولا «وصف مشكلة».
+- صورة العميل مخفية خلف نقرة الدائرة؛ تُصغّر 96px JPEG 0.82؛ بدون صورة أحرف أولية على تدرّج لوني ممزوج (نمط جهات الاتصال).
+- نقد الرئيسية (أ–و) لا يُنفّذ إلا بأمر صريح «نفّذ».
+
+## 5) نموذج البيانات
+db={lang,active,accounts:[{id,name,type:'grocery'|'personal',cur}],data:{[accId]:{customers:[{id,name,phone,photo,archived,limit}],invoices:[{id,code,cust,ts,amount,note,due,arch,alloc?}],payments:[{id,cust,ts,amount,method,alloc:[{inv,amt}]}],seq}}}
+sec={enabled,pin,dark,darkAuto,sound,vib,priv,vosk,btName,...} يُحفظ منفصلًا saveSec().
+ui=حالة واجهة حية (tf:{kind,period},pOpen,txLimit,sel,tq,cq,rec{kind,st:'rec'|'edit',d{...},cands,warn},pay,nc{photo},...) — انظر `const ui=` في §11.
+التخزين localStorage بمفتاح PLAIN أو ENC مشفّر (AES-GCM عبر crypto.subtle عند تفعيل PIN؛ masterKey من PIN+salt). دالة save() تكتب + تحذر مبكرًا عند >4MB (t('quotaWarn')).
+
+## 6) عقود الدمج الخارجية
+- الصوت: window.voskOnText(kind,text,confidence) وwindow.voskOnEnd()؛ المحرك الاختياري window.voskEngine={ready,start(kind,custId)} (فرع sec.vosk في startRec). التحليل parseSay/amtFromText يفهم الأرقام المنطوقة عربيًا؛ أخطاء صارمة warn_noamt/nospeech/lowconf/toobig.
+- الطابعات BT: خدمات GATT في BT_SERV؛ ESC/POS init 1B 40 وقص 1D 56 42 00 (printBT/btStatement).
+- QR نقل: بادئة J خام أو Z gzip؛ كشف العميل openQrStmt نص مقروء.
+- OCR tesseract اختياري (نماذجه CDN وقت التشغيل — صِرح بأن عدم التوفر offline قائم).
+
+## 7) خرائط الشاشات والتنقل
+SCREENS: home, customers, reports, settings + فرعية: profile, invoice, newcust, rec, pay, lock. التنقل go()/back()/stack؛ tab() للتبويبات؛ render() يعيد بناء #app و#tabbar و#actionrow (الأخيرة تظهر في home/customers وخارج وضع التحديد).
+الأوراق openSheet(): fab(يدوي/جهات)، homeMenu(تحديد/تصدير/QR)، accSheet(قائمة+إضافة بقالة)، photoSheet، curSheet(عملة مخصصة)، debtSheet(يدوي)، txFilter حُذفت، import مخفية لكن openImport() حية كمستقبل.
+
+## 8) طبقة أحداث الأزرار (درس مهم!)
+lpBtn() تولّد أزرار دين/سداد بثلاث طبقات: pointer + touch + click احتياطي، مع منع ازدواج (touchSeen/lpGuard). ترتيب الأحداث على اللمس: pointerdown قبل touchstart — لذا btnDown أحادي (`if(recPend)return`) وإلا تسرّب مؤقت يطلق التسجيل بعد ضغطة واحدة (حدث فعلاً وصُحح). btnClick يفتح اليدوي مباشرة لبيئات بلا Pointer Events.
+
+## 9) دروس تحرير الكود (لتجنب كوارث سابقة)
+- السلاسل داخل الملف JS أحادية الاقتباس؛ أي سمة HTML تحوي ' داخلها يجب تهريبها \' — خلط هذا أتلف الملف مرة (حذف جائر عبر indexOf امتد بين موضعين) واستُعيد من لقطة /tmp/arena-workspace/changes.zip.
+- عند حذف كتل ميتة احذف بشرائح محددة الاحتفاظ (refreshHome/pChipsHtml كادت تضيع).
+- بعد كل تعديل: node --check على المستخرج + بدلة الاختبارات + لقطة puppeteer للعنصر المتغير.
+- node_modules و.cache لا تُحفظ بين الجلسات؛ أعد `npm i` في /home/user/.pup إن لزم، ومكتبات كروم عبر sudo apt libnspr4 libnss3 ….
+
+## 10) CSS (مكثف)
+توكينات: --bg/--card/--card2/--line/--navy(#0d1f3a)/--red(#a71949)/--green(#0e7a52)/--amber/--soft/--muted؛ RTL عبر dir=rtl؛ صفوف .srow/.kv؛ شرائح .seg؛ شارات .pchip؛ أفاتار .av؛ شريط .selbar ثابت فوق العمليات (margin:12px 20px 0 + نمط navy من السطر الثاني)؛ #actionrow sticky bottom:56px؛ أوراق #sheetWrap تفتح بـ .open؛ وضع ليلي .dark يعكس التوكينات.
+
+## 11) مقتطفات الكود الحرجة + خريطة الدوال
+## خريطة الدوال (مكثف)
+- save() — كتابة db إلى localStorage (PLAIN/ENC) + إنذار سعة >4MB
+- saveSec() — حفظ إعدادات sec منفصلة
+- encJSON/decJSON — AES-GCM عبر crypto.subtle بمفتاح مشتق من PIN
+- t(k)/CUR()/cName() — ترجمة/عملة حالية/اسم دولة
+- DD()/curAcc()/isP() — بيانات الحساب النشط/الحساب/شخصي؟
+- cust(id)/custOpen(id)/custInvoices(id)/invRem(id) — عميل/رصيده المفتوح/فواتيره/متبقي فاتورة
+- txAll()/filteredTx() — كل الحركات/مفلترة kind+period+بحث مع __txFull وtxLimit
+- feedHtml()/txRow(x)/dayLabel(ts) — قائمة الرئيسية/صف حركة/فاصل يوم
+- pChipsHtml()/setPChip(k) — فلتر مطوي ثلاثي داخل صف العنوان
+- refreshHome() — تحديث txlist+txn+pchips+stats بدون إعادة بناء كاملة
+- statsCards() — بطاقتا دين/سداد (toggle kind)
+- selStart/selExit/selToggle/selAllVisible/selDelete/selArchive/selShare — وضع التحديد الواتسابي فوق العمليات
+- openHomeMenu() — ⋮: تحديد/تصدير/QR (استيراد ووصف مشكلة محذوفان)
+- openFabSheet() — + : عميل يدوي / من جهات الاتصال فقط
+- openAccSheet()/renderAccSheet()/accRow(x)/switchAcc(id) — الحسابات: بقالة فقط + نشط شخصي إن وجد؛ صف معلوماتي
+- openContacts()/pickFromContact() — جهات اتصال مقترحة محليًا
+- openPhotoSheet/pickPhoto/removePhoto — صورة خلف الدائرة؛ canvas 96px JPEG .82
+- avat(name,size)/avColor(name) — <img> إن صورة، وإلا أحرف على linear-gradient ممزوج
+- lpBtn(kind,cls,icon,label) — زر دين/سداد بثلاث طبقات أحداث مع منع ازدواج
+- btnDown/btnDownP/btnDownT/btnUp/btnUpP/btnUpT/btnClick/btnCancelRec — مطوّلة380ms=صوت/ضغطة=يدوي/احتياطي click؛ btnDown أحادي لمنع تسرب مؤقت
+- startRec(kind,custId) — ui.rec st=rec؛ voskEngine إن sec.vosk وإلا tryWebASR وإلا endRec بعد 2600
+- tryWebASR/handleSay/voskOnText/voskOnEnd — التقاط متصفح/معالج موحّد/عقد VOSK الخارجي
+- parseSay/amtFromText — اسم+مبلغ من نص؛ أرقام منطوقة عربية؛ كشف أخطاء صارم
+- endRec() — بلا اختراع: فارغ+warn nospeech؛ st=edit
+- readRecFields()/recConfirm() — قراءة الحقول مباشرة ثم حفظ دين/سداد مع alloc وتوست تراجع
+- payImpactFor(cid,amt) — معاينة أثر السداد على أقدم الفواتير
+- openDebtSheet(preId)/manualDebtSave() — اليدوي
+- openCurSheet()/saveCur()/setCur(v) — عملة مخصصة بورقة لا prompt
+- statementText(id)/openExport() — كشف نصي/تصدير Excel (بدون NaN)
+- openQrSend/openQrRecv/openQrStmt — QR نقل J/Z-gzip وكشف عميل
+- connectBT/btWrite/printBT/btStatement — طباعة حرارية ESC/POS عبر GATT
+- openImport()/doImport()/readImp/ocrPick — استيراد نص/CSV وملف وOCR — حية لكن مخفية (مستقبلي)
+- openReport حُذفت — وصف مشكلة أزيل بطلب المستخدم
+- go/back/tab/render/SCREENS — تنقل ومكدس وبناء الشاشات
+- S_home/S_customers/S_reports/S_settings/S_profile/S_invoice/S_rec/S_pay/S_newcust/S_lock — بنّاؤون الشاشات
+- toastMsg/openSheet/closeSheet — توست وأوراق سفلية
+- setLang(l)/applyDark() — لغة/وضع ليلي
+- selFind/key — مرجع حذف/أرشفة
+- waRemind(invId) — تذكير واتساب wa.me
+- feedback/speak — اهتزاز+نطق اختياري
+```js
+/* lpBtn+events */
+let touchSeen=0;const lpLast={t:0,k:''};
+function lpGuard(k){const n=Date.now();if(lpLast.k===k&&n-lpLast.t<450)return false;lpLast.t=n;lpLast.k=k;return true}
+function btnDownT(k){touchSeen=Date.now();btnDown(k)}
+function btnDownP(k){if(Date.now()-touchSeen<800)return;btnDown(k)}
+function btnUpT(k){touchSeen=Date.now();if(!lpGuard(k))return;btnUp(k)}
+function btnUpP(k){if(Date.now()-touchSeen<800)return;if(!lpGuard(k))return;btnUp(k)}
+function btnClick(k){if(Date.now()-touchSeen<800)return;if(recPend||ui.rec&&ui.rec.st==='rec')return;if(!lpGuard(k))return;clearTimeout(recPend);recPend=null;if(k==='debt')openDebtSheet(ctxCust());else{ui.pay={cust:ctxCust(),amt:'',method:'cash',done:null};go('pay',ctxCust()?{cust:ctxCust()}:{})}}
+function lpBtn(kind,cls,icon,label){return '<button class="btn '+cls+'" onpointerdown="btnDownP(\''+kind+'\')" onpointerup="btnUpP(\''+kind+'\')" onpointerleave="btnCancelRec()" ontouchstart="btnDownT(\''+kind+'\')" ontouchend="btnUpT(\''+kind+'\')" onclick="btnClick(\''+kind+'\')" oncontextmenu="return false">'+ic(icon,18)+label+'</button>'}
+function btnDown(kind){if(recPend)return;recPend=setTimeout(()=>{recPend=null;try{if(sec.vib&&navigator.vibrate)navigator.vibrate(30)}catch(e){}startRec(kind)},380)}
+function btnCancelRec(){clearTimeout(recPend)}
+function btnUp(kind){if(recPend){clearTimeout(recPend);recPend=null;
+ if(kind==='debt')openDebtSheet(ctxCust());
+ else{ui.pay={cust:ctxCust(),amt:'',method:'cash',done:null};go('pay',ctxCust()?{cust:ctxCust()}:{})}}}
+/* lpBtn+events */
+let touchSeen=0;const lpLast={t:0,k:''};
+function lpGuard(k){const n=Date.now();if(lpLast.k===k&&n-lpLast.t<450)return false;lpLast.t=n;lpLast.k=k;return true}
+function btnDownT(k){touchSeen=Date.now();btnDown(k)}
+function btnDownP(k){if(Date.now()-touchSeen<800)return;btnDown(k)}
+function btnUpT(k){touchSeen=Date.now();if(!lpGuard(k))return;btnUp(k)}
+function btnUpP(k){if(Date.now()-touchSeen<800)return;if(!lpGuard(k))return;btnUp(k)}
+function btnClick(k){if(Date.now()-touchSeen<800)return;if(recPend||ui.rec&&ui.rec.st==='rec')return;if(!lpGuard(k))return;clearTimeout(recPend);recPend=null;if(k==='debt')openDebtSheet(ctxCust());else{ui.pay={cust:ctxCust(),amt:'',method:'cash',done:null};go('pay',ctxCust()?{cust:ctxCust()}:{})}}
+function lpBtn(kind,cls,icon,label){return '<button class="btn '+cls+'" onpointerdown="btnDownP(\''+kind+'\')" onpointerup="btnUpP(\''+kind+'\')" onpointerleave="btnCancelRec()" ontouchstart="btnDownT(\''+kind+'\')" ontouchend="btnUpT(\''+kind+'\')" onclick="btnClick(\''+kind+'\')" oncontextmenu="return false">'+ic(icon,18)+label+'</button>'}
+function btnDown(kind){if(recPend)return;recPend=setTimeout(()=>{recPend=null;try{if(sec.vib&&navigator.vibrate)navigator.vibrate(30)}catch(e){}startRec(kind)},380)}
+function btnCancelRec(){clearTimeout(recPend)}
+function btnUp(kind){if(recPend){clearTimeout(recPend);recPend=null;
+ if(kind==='debt')openDebtSheet(ctxCust());
+ else{ui.pay={cust:ctxCust(),amt:'',method:'cash',done:null};go('pay',ctxCust()?{cust:ctxCust()}:{})}}}
+function amtFromText(text){
+  const nd=String(text).replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴٥٦٨٩'.indexOf(c)));
+  const m=nd.match(/\d+(?:[.,]\d+)?/);
+  if(m)return {amt:parseFloat(m[0].replace(',','.')),start:m.index,end:m.index+m[0].length,raw:true};
+  const w=words2num(nd);
+  return w.amt>0?{amt:w.amt,start:w.start,end:w.end,raw:true}:{amt:0,start:0,end:0,raw:false};
+}
+const HU={'مئة':1,'مائة':1,'مية':1,'ماية':1,'مايه':1,'مئه':1};
+const W1={'صفر':0,'واحد':1,'واحدة':1,'احد':1,'أحد':1,'اثنين':2,'اثنان':2,'اثنتان':2,'اتنين':2,'تنين':2,'ثلاثة':3,'ثلاث':3,'تلاتة':3,'تلات':3,'اربعة':4,'أربعة':4,'اربع':4,'أربع':4,'خمسة':5,'خمس':5,'خمست':5,'سته':6,'ستة':6,'ست':6,'سبعه':7,'سبعة':7,'سبع':7,'ثمانية':8,'ثمان':8,'تمانية':8,'ثمانيه':8,'تسعة':9,'تسع':9,'تسعه':9};
+const W10={'عشرة':10,'عشر':10,'عشرت':10,'عشرون':20,'عشرين':20,'تلاتون':30,'ثلاثون':30,'ثلاثين':30,'تلاتين':30,'اربعون':40,'أربعون':40,'اربعين':40,'أربعين':40,'خمسون':50,'خمسين':50,'ستون':60,'ستين':60,'سبعون':70,'سبعين':70,'ثمانون':80,'ثمانين':80,'تمانون':80,'تمانيه':8,'تسعون':90,'تسعين':90};
+const E1={'zero':0,'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12,'thirteen':13,'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,'nineteen':19};
+const E10={'twenty':20,'thirty':30,'forty':40,'fifty':50,'sixty':60,'seventy':70,'eighty':80,'ninety':90};
+function hunMul(t){ // returns u for "<u> مئة" combos like ثلاثمئة / خمسمية / تلاتمية
+  const m=t.match(/^(واحد|واحدة|احد|أحد|اثنتين|اثنين|اثنان|اتنين|ثلاثة|ثلاث|تلاتة|تلات|اربعة|أربعة|اربع|أربع|خمسة|خمس|خمست|سته|ستة|ست|سبعه|سبعة|سبع|ثمانية|ثمان|تمانية|تسعة|تسع|تسعه)(مئة|مائة|مية|ماية|مايه|مئه)$/);
+  if(!m)return 0;return W1[m[1]]||0}
+function words2num(s){
+  const toks=String(s).toLowerCase().split(/[^0-9a-zA-Z؀-ۿ]+/).filter(Boolean);
+  let total=0,cur=0;const usedSet=new Set();
+  for(let i=0;i<toks.length;i++){
+    let t=toks[i].replace(/^و+/,'');let used=true;let extra=false;
+    if(t==='و'||t==='and'){used=false}
+    else if(HU[t]){cur=(cur||1)*100}
+    else if(t==='مئتان'||t==='مائتان'||t==='ميتين'||t==='مايتين'){cur+=200}
+    else if(hunMul(t)){cur+=hunMul(t)*100}
+    else if(t==='الف'||t==='ألف'){total+=(cur||1)*1000;cur=0}
+    else if(t==='الفين'||t==='ألفين'||t==='الفان'||t==='ألفان'){total+=2000;cur=0}
+    else if(t==='الاف'||t==='آلاف'||t==='الآلاف'){total+=(cur||1)*1000;cur=0}
+    else if(W10[t]!==undefined){cur+=W10[t]}
+    else if(W1[t]!==undefined){
+      const nx=toks[i+1];
+      if(nx&&/^(عشر|عشرة|عشره)$/.test(nx.replace(/^و+/,''))){cur+=10+W1[t];i++;extra=true}
+      else if(nx&&HU[nx.replace(/^و+/,'')]){cur+=W1[t]*100;i++;extra=true}
+      else cur+=W1[t];
+    }
+    else if(E1[t]!==undefined){cur+=E1[t]}
+    else if(E10[t]!==undefined){cur+=E10[t]}
+    else if(t==='hundred'){cur=(cur||1)*100}
+    else if(t==='thousand'){total+=(cur||1)*1000;cur=0}
+    else used=false;
+    if(used){usedSet.add(i);if(extra)usedSet.add(i-1)}
+  }
+  const usedIdx=[...usedSet].sort((a,b)=>a-b);
+  if(!usedIdx.length)return {amt:0,start:0,end:0};
+  let pos=0;const starts=[],ends=[];
+  for(let i=0;i<toks.length;i++){const at=s.indexOf(toks[i],pos);starts.push(at);ends.push(at+toks[i].length);pos=at+toks[i].length}
+  return {amt:total+cur,start:starts[usedIdx[0]],end:ends[usedIdx[usedIdx.length-1]]};
+}
+
+function parseSay(text){const a=amtFromText(text);const amt=a.amt||0;
+ const before=a.raw?text.slice(0,a.start).trim():text.trim();let after=a.raw?text.slice(a.end).trim():'';
+ after=after.replace(/ريال|ريالات|ر\.س|جنيه|درهم|ليرة|فقط|only|net/g,'').trim();
+ const cs=DD().customers.filter(c=>!c.archived);let name=before,custId=null;
+ const hit=(before&&(cs.find(c=>c.name===before)||cs.find(c=>c.name.includes(before))||cs.find(c=>before.includes(c.name.split(' ')[0]))))||null;
+ if(hit){name=hit.name;custId=hit.id}
+ return {name,amt,note:after,custId}}
+function handleSay(kind,text,conf){const r0=ui.rec;if(!r0||!(r0.st==='rec'||(r0.st==='edit'&&!r0.d.say)))return;clearTimeout(recEnd);
+ const pr=parseSay(text||'');let warn=null;
+ if(!text||!String(text).trim())warn='nospeech';else if(pr.amt<=0)warn='noamt';else if(pr.amt>1000000)warn='toobig';else if((conf==null?1:conf)<0.45)warn='lowconf';
+ r0.warn=warn;if(warn)toastMsg(t('warn_'+warn));
+ r0.d=kind==='debt'?{name:pr.name,amt:pr.amt,note:pr.note,due:null,say:text,custId:pr.custId}:{name:pr.name,amt:pr.amt,method:'cash',say:text,custId:pr.custId};
+ r0.st='edit';render()}
+window.voskOnText=(k,txt,conf)=>handleSay(k,txt,conf);
+window.voskOnEnd=()=>{const r0=ui.rec;if(r0&&r0.st==='rec'){clearTimeout(recEnd);recEnd=setTimeout(endRec,400)}};
+function tryWebASR(kind){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return false;
+ try{const r=new SR();r.lang=db.lang==='ar'?'ar-SA':'en-US';r.interimResults=false;r.maxAlternatives=1;
+  r.onresult=e=>{const res=e.results[0][0];handleSay(kind,res.transcript||'',res.confidence)};
+  r.onerror=ev=>{toastMsg(ev&&ev.error==='no-speech'?t('warn_nospeech'):t('webNo'));if(ui.rec&&ui.rec.st==='rec'){clearTimeout(recEnd);recEnd=setTimeout(endRec,600)}};
+  r.onend=()=>{if(ui.rec&&ui.rec.st==='rec'){clearTimeout(recEnd);recEnd=setTimeout(endRec,400)}};
+  r.start();return true}catch(e){return false}}
+function endRec(){const r=ui.rec;if(!r||r.st!=='rec')return;
+ if(!isP()&&!DD().customers.some(c=>!c.archived)){ui.rec=null;toastMsg(t('noCustomers'));go('newcust',{});return}
+ const pre=isP()?null:((r.pre&&cust(r.pre))||(ctxCust()?cust(ctxCust()):null));
+ r.warn=r.warn||'nospeech';
+ r.d=r.kind==='debt'?{name:pre?pre.name:'',amt:0,note:'',due:null,say:'',custId:pre?pre.id:null}:{name:pre?pre.name:'',amt:0,method:'cash',say:'',custId:pre?pre.id:null};
+ r.cands=pre?[]:DD().customers.filter(c=>!c.archived).slice(0,5);
+ r.st='edit';render()}
+/* confirm */
+function readRecFields(){const r=ui.rec;const rc=document.getElementById('re_c');if(rc){r.d.custId=rc.value;r.d.name=rc.selectedOptions[0].text}const ra=document.getElementById('re_a');if(ra)r.d.amt=parseFloat(ra.value)||0;if(r.kind==='debt'){const rn=document.getElementById('re_n');if(rn)r.d.note=rn.value;const rd=document.getElementById('re_d');if(rd)r.d.due=rd.value?new Date(rd.value+'T12:00:00').getTime():null}}
+function recConfirm(){const r=ui.rec;readRecFields();const c=isP()?null:(cust(r.d.custId)||cust(ctxCust()));if((!c&&!isP())||!r.d.amt){toastMsg(t('chooseFirst'));return}
+ if(r.kind==='debt'){const inv={id:uid(),code:'A'+(DD().seq++),cust:c?c.id:null,ts:Date.now(),amount:r.d.amt,note:r.d.note,due:r.d.due||null};DD().invoices.push(inv);save();feedback('debt');speak((c?c.name+'، ':'')+t('newDebt')+' '+r.d.amt+' '+CUR());ui.rec=null;stack=[c?{s:'profile',p:{id:c.id}}:{s:'home'}];render();if(c&&c.limit&&custOpen(c.id)>c.limit)toastMsg('⚠ '+t('overLimit'),null);const iid=inv.id;toastMsg('<b>'+t('debtDone')+'</b> · '+money(inv.amount)+'<br><span style="font-size:11.5px;opacity:.8">'+t('undoAvail')+'</span>',()=>{DD().invoices=DD().invoices.filter(x=>x.id!==iid);save();render()})}
+ else{const amt=r.d.amt;const open=c?custInvoices(c.id).filter(i=>invRem(i)>0).sort((a,b)=>a.ts-b.ts):[];let left=amt;const alloc=[];open.forEach(i=>{if(left<=0)return;const use=Math.min(invRem(i),left);left-=use;alloc.push({inv:i.id,amt:use})});DD().payments.push({id:uid(),cust:c?c.id:null,ts:Date.now(),amount:amt,method:r.d.method||'cash',alloc});save();feedback('pay');speak((c?c.name+'، ':'')+t('pay')+' '+r.d.amt+' '+CUR());ui.rec=null;ui.pay={cust:null,amt:'',method:'cash',done:{cid:c?c.id:null,cname:c?c.name:t('deposit'),amt,after:c?custOpen(c.id):0}};stack=[{s:'pay'}];render()}}
+
+```
+### قاموس العربية كامل
+```js
+ar:{today:'اليوم',customers:'العملاء',reports:'التقارير',settings:'الإعدادات',
+owed:'الديون المفتوحة',collToday:'حصّلت اليوم',searchC:'بحث عن عميل…',filter:'تصفية',
+accounts:'حسابات العملاء',last:'آخر حركة',justNow:'منذ لحظات',yest:'أمس',
+minAgo:n=>'منذ '+n+(n===1?' دقيقة':n===2?' دقيقتين':n<=10?' دقائق':' دقيقة'),
+hrAgo:n=>'منذ '+n+(n===1?' ساعة':n===2?' ساعتين':n<=10?' ساعات':' ساعة'),
+dayAgo:n=>'منذ '+n+(n===1?' يوم':n===2?' يومين':n<=10?' أيام':' يوم'),
+debtor:'مدين',settled:'مسدد',newDebt:'دين',pay:'سداد',recDebt:'تسجيل دين',recPay:'تسجيل سداد',
+addC:'عميل جديد',status:'الحالة',all:'الكل',open:'مفتوح',part:'جزئي',paid:'مسدد',
+period:'الفترة',pAll:'كل الفترات',pToday:'اليوم',pWeek:'هذا الأسبوع',pMonth:'هذا الشهر',
+sort:'الترتيب',sRecent:'الأحدث',sDebt:'الأكثر دينًا',sFreq:'الأكثر تكرارًا',noRes:'لا توجد نتائج',
+custAcc:'حساب العميل',remaining:'المتبقي',totalPaid:'إجمالي المسدد',invoices:'الفواتير',noInv:'لا توجد فواتير بعد',
+since:y=>'عميل منذ '+y,invoice:'فاتورة',payLog:'سجل السداد',noPay:'لم يُسجَّل سداد لهذه الفاتورة بعد',
+payRemaining:'سداد المتبقي',shareReceipt:'مشاركة إيصال',total:'الإجمالي',paidLbl:'المسدَّد',
+voiceTitle:'تسجيل دين بالصوت',tapMic:'اضغط الميكروفون ثم قل:',example:'«أبو خالد، خمسين ريال، رز وحليب»',
+listening:'أنا أستمع…',heard:'سمعتُ:',cust:'العميل',amount:'المبلغ',remind:'التذكير',remindPh:'رز وحليب… أو اسم للدليل',
+confirmReg:'تأكيد',editL:'تعديل',voiceHint:'الترتيب: الاسم ← السعر ← التذكير (ما أخذه العميل أو دليل يذكّرك به). يُحفظ التذكير نصًا دون تسعير.',
+debtDone:'تم تسجيل الدين',undoAvail:'تراجع خلال ثوانٍ',undo:'تراجع',
+payTitle:'تسجيل سداد',chooseC:'اختر العميل',amountNow:'المبلغ المدفوع الآن',full:'كامل المبلغ',
+method:'طريقة السداد',cash:'نقدًا',transfer:'تحويل',cardpay:'بطاقة',
+afterPay:'الحالة بعد السداد',willPart:'سيصبح مسددًا جزئيًا',willPaid:'سيصبح مسددًا بالكامل',
+remainAfter:'المتبقي بعد السداد',confirmPay:'تأكيد السداد',payDone:'تم تسجيل السداد',done:'تم',viewC:'عرض العميل',
+nameReq:'اسم العميل *',phone:'رقم الهاتف — اختياري',fromContacts:'اختيار من جهات الاتصال',
+privacyC:'بيانات العميل لا تغادر جهازك.',saveC:'حفظ العميل',contactsT:'اختيار جهة اتصال',
+searchName:'ابحث بالاسم أو الرقم',contactsOnly:'تُستخدم جهات الاتصال لاختيار العميل فقط',
+custOpts:'خيارات العميل',editC:'تعديل بيانات العميل',shareExp:'مشاركة وتصدير',shareExpD:'PDF أو Excel أو نص',
+archC:'أرشفة العميل',archD:'يُحفظ السجل المالي ولا يُحذف',cancel:'إلغاء',archived:'تمت الأرشفة — السجل محفوظ',
+exportT:'مشاركة وتصدير',stTxt:'نسخ كشف نصي',stPdf:'تصدير PDF',stXls:'تصدير Excel',copied:'تم نسخ الكشف',
+sendWa:'تذكير واتساب',sendSms:'رسالة SMS',
+lang:'اللغة',currency:'العملة',langCur:'اللغة والعملة',curCustom:'عملة مخصصة',country:'الدولة',prefs:'التفضيلات',photoT:'صورة العميل',manualC:'عميل يدوي',manualCd:'اكتب الاسم والجوال — الصورة اختيارية',contactsD:'اختيار سريع بدون كتابة',showMore:'عرض المزيد',quotaWarn:'التخزين يقترب من الامتلاء — صدّر نسخة احتياطية من الإعدادات.',photoAdd:'إضافة / تغيير صورة',photoD:'تُصغَّر تلقائيًا كي لا تؤثر على التطبيق',photoDel:'إزالة الصورة',accName:'اسم المحل / الحساب',saveName:'حفظ',dataSec:'البيانات',
+exportAll:'تصدير كل البيانات (Excel)',importT:'استيراد دفتر (نص/CSV)',importD:'كل سطر: الاسم، المبلغ، التذكير',importGo:'استيراد',imported:n=>'تم استيراد '+n+' عملية',
+reset:'إعادة تعيين البيانات التجريبية',resetQ:'استبدال كل البيانات الحالية؟',
+about:'عن التطبيق',aboutD:'دَفتَري — دفتر ديون يعمل محليًا 100% ويبقى معك.',appName:'دَفتَري',tagline:'دفتر ديون البقالة',m6:'آخر 6 أشهر: دين جديد مقابل تحصيل',ocrBtn:'صورة دفتر قديم (OCR)',ocrRun:'جارٍ قراءة الصورة… قد يستغرق دقيقة',ocrNo:'تعذّرت القراءة — محرّك OCR يحتاج الإنترنت عند أول استخدام',quota:'امتلأت مساحة التخزين — صدِّر نسخة احتياطية الآن',todayDebt:'دين اليوم',expToday:'مصروف اليوم',depToday:'أودعت اليوم',emptyHome:'لا عمليات بعد — اضغط مطولًا على «دين» وتكلّم، أو سجّل يدويًا',back:'رجوع',menu:'خيارات',hideAmt:'إخفاء المبالغ أو إظهارها',totalDebt:'إجمالي الديون',noToday:'لا عمليات اليوم بعد.',showAll:'عرض كل الأيام',allDays:'كل الأيام',
+savedC:'تم حفظ العميل',savedName:'تم الحفظ',chooseFirst:'اختر عميلًا أولًا',enterAmt:'أدخل مبلغًا صحيحًا',
+payOf:'دفعة',noCustomers:'لا يوجد عملاء بعد',pinned:'مثبّتون',pinU:'تثبيت',unpinU:'إلغاء التثبيت',
+sel:'تحديد',selN:n=>'تم تحديد '+n,archSel:'أرشفة المحدد',online:'متصل',offline:'دون اتصال',
+secT:'الأمان والخصوصية',setPin:'تفعيل رمز القفل',changePin:'تغيير رمز القفل',lockOff:'إيقاف القفل',
+enterPin:'أدخل رمز القفل',wrongPin:'رمز غير صحيح',fpAdd:'إضافة بصمة إصبع',fpNo:'البصمة غير مدعومة على هذا الجهاز',
+sound:'الصوت',vib:'اهتزاز',refreshed:'تم التحديث',pull:'اسحب للتحديث',
+accT:'الحسابات',addAcc:'إضافة حساب',editAcc:'تعديل الحساب',grocery:'بقالة',personal:'شخصي',
+lockNow:'قفل الآن',autoL:'قفل تلقائي بعد',m1:'دقيقة',m2:'دقيقتان',m5:'5 دقائق',
+theme:'المظهر',soon:'قريبًا',deletedKeep:'الحذف النهائي غير متاح — الأرشفة تحفظ سجلك المالي (الأفضل محاسبيًا)',
+cand:'اختر المقصود:',localOnly:'يعمل محليًا · بدون إنترنت',printTitle:'كشف حساب',voiceEng:'محرك الصوت (قابل للتبديل)',week7:'آخر 7 أيام',fpUse:'البصمة',recOn:'أسجّل… أكمل الكلام',manualDebt:'تسجيل يدوي سريع',quickPay:'سداد سريع',callC:'اتصال',openAcc2:'فتح الحساب',archivedT:'المؤرشفون',activeC:'النشطون',restore:'استعادة',noArch:'لا يوجد مؤرشفون',lastOps:'آخر العمليات',searchTx:'ابحث بالاسم أو المنتج…',filterTx:'تصفية السجل',resetF:'إعادة التعيين',typeG:'النوع',addQ:'إضافة سريعة',personalMsg:'الحساب الشخصي يسجّل مصروفاتك وإيداعاتك مباشرة — لا يحتاج إلى عملاء.',account:'الحساب',switchAcc:'تغيير الحساب',recordSound:'صوت التسجيل',vibOnRecord:'اهتزاز عند التسجيل',security:'الأمان',pinLock:'قفل برمز PIN',useFinger:'فتح بالبصمة',autoLock:'قفل تلقائي بعد (دقائق)',turnOffPin:'إيقاف القفل',off:'غير مفعّل',fpAdd:'إضافة',nOwe:'عليهم دين',totalDue:'إجمالي المستحق',selN:'محدد',selAll:'تحديد الكل',selEmpty:'لا يوجد تحديد',deletedN:n=>'تم حذف '+n+' عنصر',share:'مشاركة',archiveAct:'أرشفة',del:'حذف',txArchived:n=>'أُرشفت '+n+' حركة',copied:'تم النسخ ✓',darkMode:'الوضع الليلي',fpN:'بصمة',due:'تاريخ الاستحقاق',overdue:'متأخر',limitLbl:'سقف الدين (اختياري)',noLimit:'بلا سقف',overLimit:'تجاوز العميل سقف الدين!',overLimitS:'تجاوز السقف',waRemind:'تذكير واتساب',waNoPhone:'أضف رقم العميل أولًا من تعديل بياناته',monthDebt:'ديون الشهر',collRate:'نسبة التحصيل',bestCust:'الأكثر شراءً',overdueC:'متأخرون عن السداد',vengLbl:'محرك الصوت',webEng:'الهاتف',voskNo:'محرك Vosk غير مثبّت — راجع VOSK-SETUP.md',webNo:'محرك الهاتف غير متوفر',qrSend:'إرسال برمز QR',qrStmt:'كشف QR للعميل',qrStmtHint:'يمسح العميل الرمز بأي هاتف — يصله الكشف نصًا ويفتح في أي تطبيق.',qrRecv:'استقبال برمز QR',qrBig:'البيانات أكبر من سعة الرمز — استخدم تصدير ملف',qrHint:'افتح التطبيق على جهاز آخر ← الإعدادات ← استقبال برمز QR',qrScan:'وجّه الكاميرا نحو رمز الجهاز الآخر',qrDone:'تم استلام الدفتر ✓',qrCam:'الكاميرا غير متوفرة',darkDay:'نهاري',darkNight:'ليلي',darkAuto:'تلقائي',speakLbl:'نطق الاسم والمبلغ بعد التسجيل',btPrint:'طباعة بلوتوث',btConn:'توصيل',btNo:'البلوتوث غير متاح في هذا المتصفح',btFail:'تعذّر الاتصال',btNoDev:'وصّل طابعة بلوتوث أولًا من الإعدادات',voskOpt:'محرك VOSK (دمج اختياري)',voskOn:'تفعيل VOSK',voskOff:'إيقاف VOSK',voskHelp:'اختياري ومخفي في آخر الإعدادات لتوفير المساحة.\nلدمجه: اتبع VOSK-SETUP.md (نموذج vosk-ar).\nيفهم الأرقام المنطوقة محليًا بدون إنترنت، وإن غاب يتجاهله التطبيق تلقائيًا.',strictT:'تعليمات النطق الصارمة',strictRules:'١) قل: «دين» أو «سداد» ← الاسم ← المبلغ.\n٢) المبلغ يُفهم أرقامًا (50 / ٥٠) أو كلامًا (خمسين، مية وعشرين، ألف وخمسين).\n٣) أي خطأ يُكتشف فورًا ويُعرض برسالة واضحة مع تصحيح يدوي قبل الحفظ.',warn_noamt:'لم أسمع مبلغًا صالحًا — عدّله يدويًا أو أعد التسجيل',warn_nospeech:'لم يُلتقط أي كلام — اقترب وأعد المحاولة',warn_lowconf:'ثقة التعرف منخفضة — راجع المبلغ قبل التأكيد',warn_toobig:'المبلغ غير منطقي (يتجاوز المليون) — صحّحه يدويًا',strictFix:'تحقق من المبلغ والاسم في النموذج أدناه قبل التأكيد.'}
+
+```
+## 12) مخزون الاختبارات (252 فحصًا)
+r1_home 12 (هيكل/مطوّلة/نقرة احتياطية)، r2_personal 22 (الحساب الشخصي وإخفاؤه من الواجهة)، r3_rec 13 (عقد VOSK وعدم الاختراع وحقول مباشرة)، r4_customers 16، r5_select 22 (تحديد واتساب-ستَايل)، r6_quickpack 13، r7_pro 12، r8_priv 10، r9_strict 18 (تحليل الأرقام المنطوقة)، r10_langcur 14، r11_photo 11، r12_fabreport 11 (+قائمة/شريط/مستقبليات)، r13_chips 12 (الفلتر المطوي)، r14_fixes 9 (إصلاحات التدقيق)، test18 16 (استيراد/OCR)، test19 24، test20 17.
+
+## 13) سجل القرارات PATCH18–35 (موجز)
+18-26: اختيار نمط ملفات، QR كشف عميل، NaN export fix، 201→201. 27: عقد VOSK + بلا اختراع + صورة مخفية/تدرّج. 28: + = يدوي/جهات + وصف مشكلة (ثم حُذف 30). 29: فلتر ثلاثي. 30: طيّ الفلتر/شريط واتساب/إخفاء استيراد+مشكلة. 31: دمج الفلتر صغيرًا بصف العنوان. 32: ثلاث طبقات أحداث + btnDown أحادي. 33: إخفاء «شخصي» + صف حساب معلوماتي. 34: حذف «تعديل» من تأكيد التسجيل + قراءة حقول مباشرة. 35: تدقيق شامل = أسماء ARIA، عدّاد صادق + عرض المزيد، حذف ميت، عملة بورقة لا prompt، إنذار سعة.
+
+## 14) للمتابعة
+انتظر أمر «نفّذ» لنقد الرئيسية أ–و. المؤجلات native: إعادة تسمية/تقسيم/Keystore. إن طلب المستخدم تعارضًا مع §4 قدّم تنبيهًا قصيرًا ثم نفّذ رغبته الأخيرة (فهو المصدر).
+
+## 15) VOSK-SETUP.md كامل (عقد دمج المحرك)
+```md
+# تفعيل محرك Vosk (تعرف صوتي عربي دون إنترنت)
+
+التطبيق يشحن بثلاثة محركات صوت قابلة للتبديل من: الإعدادات ← «محرك الصوت»:
+1. **DEMO** — محاكاة فورية (يعمل دائمًا، بلا إنترنت).
+2. **الهاتف** — محرك جوجل/آبل المدمج (تعرف حقيقي، يحتاج إنترنت في أغلب المتصفحات).
+3. **VOSK** — تعرف عربي حقيقي دون إنترنت، ويتطلب الخطوات أدناه.
+
+## لماذا ملفات إضافية؟
+نموذج العربية الرسمي `vosk-model-ar-mgb2-0.4` حجمه ~318 ميغا، ومحرك الويب يعمل عبر WebAssembly —
+لا يمكن تضمينهما داخل ملف HTML الواحد، لذلك يكتشف التطبيق وجودهما تلقائيًا وإن غابا يعرض رسالة ويكمل بالمحاكاة.
+
+## خطوات التثبيت على استضافتك
+1. بجوار `index.html` أنشئ مجلد `lib/` (موجود مسبقًا وبه qrcode.js و jsQR.js).
+2. نزّل نموذج العربية وفكّه باسم `model-ar/`:
+   ```
+   curl -O https://alphacephei.com/vosk/models/vosk-model-ar-mgb2-0.4.zip
+   unzip vosk-model-ar-mgb2-0.4.zip -d model-ar
+   ```
+3. ثبّت محرك المتصفح وانسخ ملفاته إلى `lib/`:
+   ```
+   npm i vosk-browser
+   cp node_modules/vosk-browser/dist/* lib/
+   ```
+4. شغّل خادمًا يرسل ترويستات العزل (شرط WASM متعدد الخيوط):
+   ```
+   Cross-Origin-Opener-Policy: same-origin
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+   مثال سريع بـ Node:
+   ```
+   npx http-server -H '{"Cross-Origin-Opener-Policy":"same-origin","Cross-Origin-Embedder-Policy":"require-corp"}'
+   ```
+5. أضف قبل وسم `<script>` الرئيسي في index.html:
+   ```html
+   <script src="lib/vosk-browser.js"></script>
+   <script src="lib/vosk-adapter.js"></script>
+   ```
+6. من الإعدادات اختر VOSK — ستظهر حالة «جاهز» ويبدأ التعرف على الكلام المنطوق فعليًا دون إنترنت.
+
+## تحسين الدقة بلهجتك
+نموذج mgb2 مدرّب بالفصحى ولهجات؛ لرفع دقة أسماء عملائك عدّل قائمة المفردات في
+`model-ar/conf/mfcc.conf` أو أضف ملف `model-ar/conf/words.txt` بأسماء عملائك — المحرك يقبل قاموسًا ديناميكيًا.
+
+## بديل أخف
+إن كانت الاستضافة بلا ترويستات العزل، استخدم محرك «الهاتف» (خيار 2) — يعمل فورًا وبدقة عالية مع الإنترنت.
+
+## عقد الدمج مع الضغط المطوّل (دين / سداد)
+عند دمج محرك VOSK يكفي أن يوفّر الكائن `window.voskEngine={ready:true,start(kind,custId){…}}`
+ويستدعي واجهتين عموميتين جهّزهما التطبيق:
+- `window.voskOnText(kind, text, confidence)` — kind: ‏'debt' أو 'pay'، والنص المنطوق، وثقة اختيارية بين 0 و1.
+- `window.voskOnEnd()` — عند نهاية الاستماع دون نتيجة.
+
+يتولى التطبيق الباغي: تحليل الأرقام المنطوقة، وكشف الأخطاء الصارم (لا مبلغ، ثقة منخفضة، مبلغ غير منطقي)،
+و**لا يخترع أبدًا** ديونًا أو مواد تموينية من تلقاء نفسه — إن لم تصل نتيجة يفتح نموذجًا فارغًا للتصحيح اليدوي.
+
+مثال محوّل جاهز:
+```js
+window.voskEngine={ready:true,start(kind,custId){
+  const r=شغّل_التعرف_الخاص_بك();
+  r.onPartial=t=>window.voskOnText(kind,t,r.confidence);
+  r.onEnd=()=>window.voskOnEnd();
+}}
+```
+ثم فعِّله من: الإعدادات ← «محرك VOSK (دمج اختياري)».
+
+```
+
+## 16) هيكل الاختبارات h.js
+```js
+// shared harness for dafter tests
+const fs=require('fs');
+const {JSDOM,VirtualConsole}=require('jsdom');
+const html=fs.readFileSync(require('path').join(__dirname,'..','index.html'),'utf8');
+function boot(opts={}){
+ const store=opts.store||{};
+ const vc=new VirtualConsole();
+ vc.on('jsdomError',e=>{if(!/scrollTo/.test(e.message))console.log('JSDOM-ERR:',e.message)});
+ const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://x.test/',pretendToBeVisual:true,virtualConsole:vc,
+  beforeParse(w){
+   try{Object.defineProperty(w.navigator,'language',{value:opts.lang||'ar-SA',configurable:true})}catch(e){}
+   if(opts.darkMq){try{Object.defineProperty(w,'matchMedia',{value:q=>({matches:/dark/.test(q),addEventListener(){},addListener(){}}),configurable:true})}catch(e){}}
+   w.localStorage={getItem:k=>(k in store)?store[k]:null,setItem:(k,v)=>store[k]=String(v),removeItem:k=>delete store[k]};
+   w.scrollTo=()=>{}; w.confirm=()=>true; w.prompt=()=>(opts.prompt||'x');
+   if(opts.tts){w.SpeechSynthesisUtterance=class{constructor(t){this.text=t}};w.speechSynthesis={said:[],speak(u){this.said.push(u.text)},getVoices:()=>[],cancel(){}}}
+   w.AudioContext=function(){return{createOscillator:()=>({connect:()=>{},start:()=>{},stop:()=>{},frequency:{value:0}}),createGain:()=>({connect:()=>{},gain:{value:0}}),destination:{},currentTime:0,state:'running',close:()=>Promise.resolve()}};
+   w.SpeechRecognition=undefined;
+  }});
+ return dom.window;
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function mk(okFn){let pass=0,fail=0;
+ const ok=(c,m)=>{c?(pass++):(fail++,console.log('  FAIL:',m));console.log((c?'  ok ':'  ✗ ')+m)};
+ const done=()=>{console.log('\nRESULT: '+pass+' passed, '+fail+' failed');process.exit(fail?1:0)};
+ return {ok,done,stats:()=>({pass,fail})};
+}
+module.exports={boot,wait,mk,html};
+
+```
+
+## 17) اختبارات مرجعية كاملة
+
+### tests/r3_rec.js
+```js
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+const txt=()=>d.getElementById('app').textContent;
+(async()=>{
+ await wait(1000);
+ w.eval("btnDown('debt')"); await wait(80); w.eval("btnUp('debt')"); await wait(80);
+ ok(/تسجيل يدوي/.test(d.getElementById('sheet').textContent),'quick tap -> manual sheet');
+ d.getElementById('md_a').value='15'; w.eval("manualDebtSave()"); await wait(80);
+ ok(w.eval("DD().invoices.some(i=>i.amount===15)"),'manual debt saved');
+ w.eval("stack=[{s:'home'}];render();btnDown('debt')"); await wait(500);
+ ok(/أسجّل/.test(txt()),'long press -> recording');
+ w.eval("voskOnText('debt','أبو خالد خمسين',0.9)"); await wait(60);
+ ok(w.eval("ui.rec.d.amt")===50,'VOSK contract parses spoken amount');
+ const n0=w.eval("DD().invoices.length");
+ w.eval("recConfirm()"); await wait(80);
+ ok(w.eval("DD().invoices.length")===n0+1,'debt confirmed +1');
+ w.eval("stack=[{s:'home'}];render();btnDown('pay')"); await wait(500);
+ ok(/أسجّل/.test(txt()),'pay long press recording');
+ await wait(3200);
+ ok(w.eval("ui.rec&&ui.rec.st==='edit'"),'no engine -> manual edit, nothing invented');
+ ok(w.eval("ui.rec.d.amt")===0&&!w.eval("ui.rec.d.say"),'no invented amount or grocery items');
+ ok(txt().includes(w.eval("t('warn_nospeech')")),'strict no-speech warning shown');
+ ok(!!d.getElementById('re_a'),'amount field directly editable (no edit step)');
+ ok(!txt().includes(w.eval("t('editL')")),'no separate edit button');
+ w.eval("voskOnText('pay',DD().customers[0].name+' ثلاثين',0.9)"); await wait(60);
+ w.eval("recConfirm()"); await wait(80);
+ ok(w.eval("ui.pay.done&&ui.pay.done.amt")===30,'pay recorded via VOSK contract (30)');
+ w.eval("stack=[{s:'home'}];render();btnDown('debt')"); await wait(200);
+ w.eval("btnCancelRec()"); await wait(500);
+ ok(!/أسجّل/.test(txt()),'cancel within 380ms prevents recording');
+ done();
+})().catch(e=>{console.log('ERROR:',e);process.exit(1)});
+
+```
+
+### tests/r9_strict.js
+```js
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+const txt=()=>d.getElementById('app').textContent;
+(async()=>{
+ await wait(1000);
+ // --- strict number understanding (digits + arabic words + colloquial) ---
+ const cases=[['50',50],['٥٠',50],['خمسين',50],['خمسة وعشرين',25],['مئة وعشرين',120],['مية وخمسين',150],['ألف وخمسين',1050],['ثلاثمية',300],['عشرين',20],['twenty five',25]];
+ let allnum=true;
+ for(const [t,v] of cases){const r=w.eval("amtFromText("+JSON.stringify(t)+").amt");if(r!==v){allnum=false;console.log('  numfail',t,r,v)}}
+ ok(allnum,'amtFromText understands digits & spoken arabic/colloquial/en numbers');
+ ok(w.eval("amtFromText('أبو خالد خمسين ريال').amt")===50,'amount extracted inside sentence');
+ ok(w.eval("parseSay('أبو خالد خمسين').amt")===50,'parseSay: spoken amount 50');
+ ok(w.eval("parseSay('أبو خالد خمسين').name")==='أبو خالد','parseSay: name before spoken amount');
+ ok(w.eval("parseSay('سارة مئة وعشرين ر.س').amt")===120&&w.eval("parseSay('سارة مئة وعشرين ر.س').note")==='','parseSay: currency word stripped from note');
+ // --- strict errors detection ---
+ ok(w.eval("parseSay('أبو خالد').amt")===0,'no amount -> 0 (triggers warn path)');
+ w.eval("ui.rec={kind:'debt',st:'confirm',warn:'noamt',cands:[],d:{name:'أبو خالد',amt:0,note:'',due:null,say:'أبو خالد'}};stack=[{s:'rec',p:{kind:'debt'}}];render()");
+ ok(txt().includes(w.eval("t('warn_noamt')")),'no-amount warning banner shown');
+ ok(txt().includes(w.eval("t('strictFix')")),'strict fix instruction shown with warning');
+ w.eval("ui.rec={kind:'debt',st:'confirm',warn:'toobig',cands:[],d:{name:'x',amt:2000000,note:'',due:null,say:'x'}};stack=[{s:'rec',p:{kind:'debt'}}];render()");
+ ok(txt().includes(w.eval("t('warn_toobig')")),'implausible amount warning shown');
+ // --- rec screen shows strict rules card ---
+ w.eval("ui.rec={kind:'debt',st:'rec',cands:[],d:{}};stack=[{s:'rec',p:{kind:'debt'}}];render()");
+ ok(txt().includes(w.eval("t('strictT')")),'recording screen shows strict voice rules');
+ ok(txt().includes(w.eval("t('strictRules')")),'rules list visible while recording');
+ w.eval("cancelRec()");
+ // --- vosk option: present, last, collapsed by default ---
+ w.eval("sec.vosk=false;saveSec();tab('settings')");await wait(80);
+ const st=txt();
+ ok(st.includes(w.eval("t('voskOpt')")),'VOSK option row present in settings');
+ ok(!st.includes(w.eval("t('voskHelp')")),'VOSK collapsed by default (no space taken)');
+ const stt=txt();
+ ok(stt.indexOf(w.eval("t('voskOpt')"))>stt.indexOf(w.eval("t('qrRecv')")),'VOSK row is after data/QR section (last)');
+ w.eval("ui.voskOpen=true;render()");await wait(60);
+ ok(txt().includes(w.eval("t('voskHelp')")),'expanding shows VOSK instructions');
+ ok(txt().includes(w.eval("t('voskOn')")),'enable button visible when expanded');
+ w.eval("ui.voskOpen=false;render()");
+ // --- startRec with vosk enabled but engine absent: graceful fallback + toast ---
+ w.eval("sec.vosk=true;saveSec()");
+ w.eval("stack=[{s:'home'}];render()");
+ w.eval("startRec('debt')");await wait(80);
+ ok(w.eval("ui.rec&&ui.rec.st==='rec'"),'recording still starts when VOSK missing');
+ w.eval("cancelRec()");w.eval("sec.vosk=false;saveSec()");
+ // --- ASR onresult warn wiring (simulated) ---
+ w.eval("startRec('debt')");await wait(50);
+ const fake={results:[[{transcript:'أبو خالد',confidence:0.9}]],[0]:'x'};
+ w.eval("ui.rec.warn=null; (function(){const res={transcript:'أبو خالد',confidence:0.9};const pr=parseSay(res.transcript);let warn=null;if(!res.transcript.trim())warn='nospeech';else if(pr.amt<=0)warn='noamt';else if(pr.amt>1000000)warn='toobig';else if(res.confidence<0.45)warn='lowconf';window.__w=warn})()");
+ ok(w.eval("window.__w")==='noamt','warn logic flags missing amount');
+ w.eval("cancelRec()");
+ done();
+})().catch(e=>{console.log('EX',e);process.exit(1)});
+
+```
+
+### tests/r13_chips.js
+```js
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+(async()=>{
+ await wait(1000);
+ w.eval("tab('home')"); await wait(60);
+ const seg=()=>d.getElementById('pchips');
+ ok(!!seg(),'home has period chips');
+ ok(seg().querySelectorAll('button').length===1,'collapsed by default: single small button');
+ ok(seg().textContent.includes(w.eval("t('period')")),'collapsed shows period label when none');
+ w.eval("ui.pOpen=true;refreshHome()"); await wait(60);
+ const btns=[...seg().querySelectorAll('button')];
+ ok(btns.length===3,'expanded shows exactly 3 options');
+ ok(btns.map(b=>b.textContent).join()===[w.eval("t('pToday')"),w.eval("t('pWeek')"),w.eval("t('pMonth')")].join(),'labels day/week/month only');
+ w.eval("setPChip('month')"); await wait(60);
+ ok(seg().querySelectorAll('button').length===1,'selecting collapses the row');
+ ok(seg().textContent.includes(w.eval("t('pMonth')")),'collapsed shows chosen month');
+ const allN=w.eval("(ui.tf.period='all',filteredTx().length)");
+ w.eval("ui.tf.period='month'"); await wait(20);
+ w.eval("db.data[db.active].invoices.push({id:'oldx',cust:db.data[db.active].customers[0].id,amount:5,ts:Date.now()-40*864e5000,note:'q'})"); await wait(20);
+ ok(!w.eval("filteredTx().some(x=>x.key==='d:oldx')"),'40-day-old tx excluded in month');
+ w.eval("setPChip('week');ui.pOpen=true;refreshHome()"); await wait(40);
+ ok(!w.eval("filteredTx().some(x=>x.key==='d:oldx')"),'40-day-old tx excluded in week too');
+ w.eval("setPChip('week')"); await wait(40);
+ ok(w.eval("ui.tf.period")==='all'&&seg().textContent.includes(w.eval("t('period')")),'tap active chip clears to all');
+ ok(w.eval("filteredTx().length")===allN+1,'cleared shows all incl old');
+ w.eval("db.data[db.active].invoices=db.data[db.active].invoices.filter(i=>i.id!=='oldx')"); await wait(20);
+ // compact: chips live inside the heading row (same line as lastOps)
+ const head=seg().closest('div.pad');
+ ok(head&&head.textContent.includes(w.eval("t('lastOps')")),'filter chip shares the lastOps row (no wasted line)');
+ done();
+})().catch(e=>{console.log('EX',e);process.exit(1)});
+
+```
+
+### tests/r14_fixes.js
+```js
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+(async()=>{
+ await wait(1000);
+ // a11y names
+ w.eval("tab('settings')"); await wait(80);
+ ok([...d.querySelectorAll('[role=switch]')].every(x=>x.getAttribute('aria-label')),'all switches named');
+ ok([...d.querySelectorAll('select')].every(x=>x.getAttribute('aria-label')),'all selects named');
+ // dead UI gone
+ ok(w.eval("typeof openTxFilter")==='undefined','dead filter sheet removed');
+ ok(w.eval("typeof refreshHome")==='function','refreshHome kept');
+ // accurate badge + show more
+ w.eval("tab('home')"); await wait(60);
+ const cid=w.eval("DD().customers[0].id");
+ w.eval("for(let i=0;i<70;i++)DD().invoices.push({id:'q'+i,code:'Q'+i,cust:'"+cid+"',ts:Date.now()-i*36e5,amount:1,note:'q'});render()"); await wait(80);
+ const full=w.eval("txAll().length");
+ ok(parseInt(d.getElementById('txn').textContent)===full,'badge shows true total ('+full+')');
+ ok(d.getElementById('txlist').textContent.includes(w.eval("t('showMore')")),'show-more appears past 60');
+ const rows0=w.eval("document.querySelectorAll('#txlist .litem').length");
+ w.eval("ui.txLimit=130;refreshHome()"); await wait(60);
+ ok(w.eval("document.querySelectorAll('#txlist .litem').length")>rows0,'show-more grows the list');
+ w.eval("for(let i=0;i<70;i++)DD().invoices=DD().invoices.filter(x=>x.id!=='q'+i);ui.txLimit=60;render()"); await wait(60);
+ // currency via sheet not prompt
+ w.eval("openCurSheet()"); await wait(60);
+ ok(!!d.getElementById('curIn'),'currency sheet has input (no prompt())');
+ d.getElementById('curIn').value='د.ك';
+ w.eval("saveCur()"); await wait(60);
+ ok(w.eval("curAcc().cur")==='د.ك','custom currency saved via sheet');
+ w.eval("setCur('ر.س')");
+ done();
+})().catch(e=>{console.log('EX',e);process.exit(1)});
+
+```
+
+## 18) خرائط عناصر الشاشات (مرجع سريع)
+home: hdr(شعار+اسم+accChip) → statsCards(دين/سداد toggle kind) → بحث+⋮ → صف «آخر العمليات»+شارة txn+ pchips مطوي → selbar(وضع التحديد) → txlist(+عرض المزيد) → actionrow.
+customers: بحث+فلتر عملاء → نشط/مؤرشف → بطاقة عليهم دين → clist2.
+reports: شهرية(تحصيل/ديون شهر/متأخرون) + رسم 7 أيام + топ شراء.
+settings: حساب/تفضيلات(لغة,عملة,ليلي,صوت,اهتزاز)/أمان(PIN,بصمة,قفل)/خصوصية priv/بيانات(تصدير,QR استقبال)/بلوتوث/محركات(voice engine,VOSK مخفي آخر).
+profile: بطاقة عميل(دائرة صورة←photoSheet) + كشف + أزرار(اتصال,واتساب تذكير,QR كشف,تعديل,أرشفة).
+rec: st rec=ميكروفون+قواعد صارمة؛ st edit=سمعتُ+تحذير+حقول(عميل select,مبلغ,تذكير,استحقاق)+cands+تأكيد/X+سطر خصوصية.
+pay: عميل+مبلغ+طريقة+أثر السداد payImpactFor+تم.
+newcust: دائرة صورة قابلة للنقر+اسم+جوال+حفظ.

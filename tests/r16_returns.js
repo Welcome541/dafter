@@ -1,0 +1,28 @@
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+(async()=>{
+ await wait(1000);
+ w.eval("ui.nc={name:'عميل المرتجع',phone:'',photo:null,edit:null};saveCustomer()"); await wait(60);
+ const cid=w.eval("DD().customers[DD().customers.length-1].id");
+ w.eval("DD().invoices.push({id:'ret1',code:'R1',cust:'"+cid+"',ts:Date.now(),amount:10000,note:'رز'});render()"); await wait(60);
+ w.eval("openReturnSheet('ret1')"); await wait(60);
+ ok(!!d.getElementById('retA'),'return sheet has amount input');
+ d.getElementById('retA').value='150';
+ w.eval("applyReturn('ret1')"); await wait(60);
+ ok(w.eval("DD().invoices.find(i=>i.id==='ret1').amount")===10000,'over-remaining return blocked');
+ ok(d.getElementById('toast').textContent.includes(w.eval("t('retOver')")),'over-return toast');
+ w.eval("openReturnSheet('ret1')"); await wait(40);
+ d.getElementById('retA').value='40'; d.getElementById('retN').value='رجع علبة';
+ w.eval("applyReturn('ret1')"); await wait(80);
+ const inv=w.eval("DD().invoices.find(i=>i.id==='ret1')");
+ ok(inv.amount===6000&&inv.edits.length===1,'return deducted + edit logged');
+ ok(inv.edits[0].from===10000&&inv.edits[0].to===6000,'edit stores from/to');
+ w.eval("tab('home')"); await wait(60);
+ ok(d.getElementById('txlist').textContent.includes(w.eval("t('edited')")),'home feed shows edited badge');
+ w.eval("go('invoice',{id:'ret1'})"); await wait(60);
+ ok(d.getElementById('app').textContent.includes(w.eval("t('editsLog')")),'invoice shows edits log');
+ ok(d.getElementById('app').textContent.includes('رجع علبة'),'log shows reason');
+ ok(w.eval("statementText('"+cid+"')").includes(w.eval("t('edited')")),'statement marks edited');
+ w.eval("DD().invoices=DD().invoices.filter(i=>i.id!=='ret1');DD().customers=DD().customers.filter(c=>c.id!=='"+cid+"');render()");
+ done();
+})().catch(e=>{console.log('EX',e);process.exit(1)});

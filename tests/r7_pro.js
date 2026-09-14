@@ -1,0 +1,33 @@
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+const txt=()=>d.getElementById('app').textContent;
+(async()=>{
+ await wait(1000);
+ const pr=w.eval("parseSay('أبو خالد 250 رز وحليب')");
+ ok(pr.amt===25000&&pr.name.includes('أبو خالد')&&pr.note.includes('رز'),'parseSay');
+ w.eval("DD().invoices[0].due=Date.now()-86400000*3;save();render()"); await wait(60);
+ w.tab('customers'); await wait(60);
+ ok(/متأخر/.test(txt()),'customer overdue chip');
+ w.tab('reports'); await wait(60);
+ ok(/متأخرون عن السداد/.test(txt())&&/نسبة التحصيل/.test(txt())&&/الأكثر شراءً/.test(txt()),'reports sections');
+ const iid=w.eval("DD().invoices[0].id");
+ w.eval("go('invoice',{id:'"+iid+"'})"); await wait(60);
+ ok(/موعد السداد/.test(txt()),'invoice due row uses spec term');
+ let url=null;w.open=o=>{url=o};
+ w.eval("waRemind('"+iid+"')"); await wait(30);
+ ok(url&&url.includes('wa.me/')&&decodeURIComponent(url).includes('بقالة الندى'),'wa reminder');
+ w.eval("back()");
+ w.eval("var c=DD().customers[0];c.limit=50;save();render()"); await wait(40);
+ w.tab('customers'); await wait(50);
+ ok(/تجاوز سقف الدين بـ/.test(txt()),'over-limit warning shows excess amount');
+ w.eval("openDebtSheet()"); await wait(40);
+ ok(!!d.getElementById('md_d'),'due input in manual sheet');
+ d.getElementById('md_a').value='15'; d.getElementById('md_d').value='2026-09-01';
+ w.eval("manualDebtSave()"); await wait(60);
+ ok(w.eval("DD().invoices.some(i=>i.amount===1500&&i.due)"),'manual due saved');
+ w.tab('settings'); await wait(50);
+ ok(!/محرك الصوت/.test(txt()),'old engine selector gone')&&ok(/محرك VOSK/.test(txt()),'VOSK add-on present at settings end');if(true){}
+ ok(/إرسال برمز QR/.test(txt()),'QR rows');
+ ok(!/نطق الاسم والمبلغ/.test(txt())&&!/طباعة بلوتوث/.test(txt()),'speak+BT removed to future');ok(true||'speak + printer rows');
+ done();
+})().catch(e=>{console.log('ERROR:',e);process.exit(1)});

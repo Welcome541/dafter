@@ -1,0 +1,25 @@
+const {boot,wait,mk}=require('./h');
+const w=boot(),d=w.document;const {ok,done}=mk();
+const sheet=()=>d.getElementById('sheet').textContent;
+(async()=>{
+ await wait(1000);
+ w.eval("openFabSheet()"); await wait(60);
+ ok(sheet().includes(w.eval("t('manualC')")),'+ offers manual customer');
+ ok(sheet().includes(w.eval("t('fromContacts')")),'+ offers contacts');
+ ok(!sheet().includes(w.eval("t('recDebt')"))&&!sheet().includes(w.eval("t('recPay')")),'no debt/pay customer rows in +');
+ w.eval("closeSheet()");
+ w.eval("openHomeMenu()"); await wait(60);
+ ok(sheet().includes(w.eval("t('sel')")),'menu keeps select');
+ ok(!sheet().includes(w.eval("t('importT')")),'text-import hidden from menu (future)');
+ ok(!sheet().includes('وصف مشكلة'),'problem report removed');
+ ok(w.eval("typeof openImport")==='function','import fn retained for future');
+ w.eval("closeSheet()");
+ w.eval("selStart()"); await wait(60);
+ const bar=d.querySelector('.selbar'),list=d.getElementById('txlist');
+ ok(!!bar,'selection bar present');
+ ok(!!list&&(bar.compareDocumentPosition(list)&4),'bar directly above operations');
+ ok(w.getComputedStyle(bar).position!=='fixed','bar is inline (not fixed bottom)');
+ ok(bar.querySelectorAll('button').length===5,'bar: cancel, select-all, share, archive, delete');
+ w.eval("selExit()"); await wait(40);
+ done();
+})().catch(e=>{console.log('EX',e);process.exit(1)});
