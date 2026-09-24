@@ -7,7 +7,7 @@ const w=boot(),d=w.document;const {ok,done}=mk();
  ok([...d.querySelectorAll('[role=switch]')].every(x=>x.getAttribute('aria-label')),'all switches named');
  ok([...d.querySelectorAll('select')].every(x=>x.getAttribute('aria-label')),'all selects named');
  // dead UI gone
- ok(w.eval("typeof openTxFilter")==='undefined','dead filter sheet removed');
+ ok(w.eval("typeof openTxFilter==='function'&&S_home().indexOf('openTxFilter()')>=0&&txFilterBtn().indexOf('openTxFilter()')>=0"),'openTxFilter is live code, wired into the home filter icon');
  ok(w.eval("typeof refreshHome")==='function','refreshHome kept');
  // accurate badge + show more
  w.eval("tab('home')"); await wait(60);
