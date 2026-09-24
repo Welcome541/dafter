@@ -14,7 +14,7 @@ ok(!app().textContent.includes('الديون المفتوحة'),'balance vocab r
 ok(app().innerHTML.includes('اليوم</div>')||app().textContent.includes('اليوم'),'day header اليوم in feed');
 // 3 strips are display-only now
 w.eval("document.querySelector('#stats1 .stat.red').click()");await wait(30);
-ok(w.eval("ui.tf.kind==='debt'&&ui.tf.period==='today'"),'strip tap filters debt+today per spec');
+ok(w.eval("ui.tf.kind==='all'&&ui.tf.period==='all'"),'strips are display-only: tapping no longer filters');
 w.eval("ui.tf={kind:'all',period:'all'};refreshHome()");await wait(30);
 // 3b feed shows all days grouped without filter controls
 w.eval("DD().invoices.forEach(i=>i.ts=Date.now()-2*864e5);DD().payments.forEach(pp=>pp.ts=Date.now()-2*864e5);render()");await wait(40);
@@ -40,7 +40,7 @@ w2.eval("setLang('en')");await wait(60);
 ok(w2.document.querySelector('#stats1 .stat.red .t').textContent.includes('Debt today'),'EN red = Debt today');
 ok(w2.document.querySelector('#stats1 .stat.green .t').textContent.includes('Paid today'),'EN green = Paid today');
 w2.document.querySelector('#stats1 .stat.green').click();
-ok(w2.eval("ui.tf.kind==='pay'&&ui.tf.period==='today'"),'green tap filters pay+today per spec');
+ok(w2.eval("ui.tf.kind==='all'&&ui.tf.period==='all'"),'EN green card is display-only too');
 w2.eval("ui.tf={kind:'all',period:'all'};refreshHome()");await wait(30);
 // 8 logo initial follows account name
 w2.eval("setLang('ar')");await wait(40);
