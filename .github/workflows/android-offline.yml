@@ -1,0 +1,50 @@
+name: Build offline Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - arena/3df0eada-dafter
+    paths:
+      - 'android-offline/**'
+      - 'index.html'
+      - 'lib/**'
+      - '.github/workflows/android-offline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: android-offline/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build installable debug APK
+        run: ./android-offline/build-apk.sh
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dafter-Whisper-Offline
+          path: Dafter-Whisper-Offline.apk
+          if-no-files-found: error
+          retention-days: 14
