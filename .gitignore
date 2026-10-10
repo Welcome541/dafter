@@ -1,3 +1,10 @@
 node_modules/
 .pup/
 __pycache__/
+android-offline/.gradle/
+android-offline/local.properties
+android-offline/signing.local.properties
+android-offline/*.p12
+android-offline/build/
+android-offline/app/build/
+/Dafter-Whisper-Offline.apk
