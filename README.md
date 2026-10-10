@@ -2,8 +2,8 @@
 
 تطبيق ويب محلي 100% (Local-first) لإدارة ديون البقالة: تسجيل صوتي بالعربية، سجلات يدوية، كشوف حساب، نسخ احتياطي مشفّر، ويعمل دون إنترنت. **ملف واحد `index.html` (~630KB) + مكتبات مرخّصة تجاريًا في `lib/`** — بلا خادم تطبيق وبلا بناء.
 
-> الإصدار الحالي: `r367-custlog-v2shell` (يظهر أسفل الإعدادات وفي `window.__BUILD`).
-> الاختبارات: **367 فحصًا / 0 فشل عبر 24 ملفًا** (`npm test`).
+> الإصدار الحالي: `r368-whisper-ggml-import` (يظهر أسفل الإعدادات وفي `window.__BUILD`).
+> الاختبارات: **372 فحصًا / 0 فشل عبر 25 ملفًا** (`npm test`).
 
 ---
 
@@ -39,7 +39,7 @@
 - الإجمالي/المدفوع/المتبقي، موعد السداد مع شارة تأخر، تذكير واتساب، سجل دفعات مرقّم، **مرتجع** مع سجل تعديلات، ومشاركة/تصدير.
 
 ### الصوت (محركان قابلان للتبديل)
-- محرك المتصفح (Web Speech) + Vosk اختياري دون إنترنت (VOSK-SETUP.md).
+- محرك المتصفح (Web Speech)، وVosk اختياري، وWhisper.cpp اختياري دون إنترنت عبر استيراد نموذج GGML من الإعدادات (`WHISPER-SETUP.md`).
 - قواعد نطق صارمة: دين/سداد ← اسم ← مبلغ؛ أرقام منطوقة أو مكتوبة؛ **أي مبلغ غير مسموع بوضوح لا يُحفظ أبدًا** — تحذير واضح + تصحيح يدوي قبل الحفظ؛ فشل الصوت لا يكسر التسجيل اليدوي.
 
 ### المزيد
@@ -59,7 +59,7 @@
 ## 3) التخزين والعمل دون إنترنت
 - localStorage: `dafter_v3` (قاعدة البيانات)، `dafter_v3_sec` (إعدادات القفل، device-local)، `dafter_v3_enc` (حزمة مشفرة)، `v1raw`، safety-backup.
 - IndexedDB مخزن `kv` مفتاح `db` — مشفّر عند القفل.
-- Service Worker **v2**: الغلاف network-first (لا نسخة قديمة أبدًا)، المكتبات cache-first للعمل دون إنترنت؛ حذف كاشات قديمة تلقائيًا؛ والخادم المرفق (`serve.py`) يرسل `Cache-Control: no-store`.
+- Service Worker **v5**: الغلاف network-first (لا نسخة قديمة أبدًا)، المكتبات cache-first للعمل دون إنترنت، وترويسات العزل المطلوبة لـ WebAssembly متعدد الخيوط؛ حذف كاشات قديمة تلقائيًا.
 
 ## 4) التشغيل محليًا
 ```bash
@@ -69,7 +69,7 @@ python3 serve.py          # منفذ 3000 مع no-store (أو أي خادم ثا
 بلا أي بناء. الاختبارات:
 ```bash
 npm install               # jsdom
-npm test                  # 367 فحصًا
+npm test                  # 372 فحصًا
 ```
 
 ## 5) النشر على GitHub + GitHub Pages
@@ -88,14 +88,15 @@ git push -u origin main
 | المسار | الوظيفة |
 |---|---|
 | `index.html` | التطبيق كاملًا (UI+منطق+i18n AR/EN) |
-| `sw.js` | Service Worker v2 (network-first shell) |
+| `sw.js` | Service Worker v5 (network-first shell + WebAssembly cross-origin isolation) |
 | `serve.py` | خادم تطوير/معاينة بترويسات no-store |
 | `manifest.webmanifest`, `icon512.png` | PWA |
-| `lib/` | مكتبات مثبتة محليًا ومرخّصة تجاريًا: qrcode, jsQR, chart.js (MIT), xlsx (Apache-2), tesseract (Apache-2), vosk-adapter |
-| `tests/` | 24 ملف اختبار jsdom + `runall.js` (مشغّل `npm test`) |
+| `lib/` | مكتبات محلية، منها whisper.cpp WebAssembly مع إشعار MIT؛ راجع ملفات الترخيص والمصادر في مجلداتها |
+| `tests/` | 25 ملف اختبار jsdom + `runall.js` (مشغّل `npm test`) |
 | `MIGRATION-PLAN.md` | §18–22: فرق النموذج، خطة v3، ترتيب التنفيذ، الاختبارات المسبقة، مكتشفات الكود |
 | `ARCHITECTURE-AUDIT.md`, `PHASE0-AUDIT.md` | تقارير معمارية |
 | `VOSK-SETUP.md` | دمج محرك Vosk العربي الاختياري |
+| `WHISPER-SETUP.md` | استيراد وتشغيل نموذج whisper.cpp بصيغة GGML |
 | `APP-GUIDE.txt`, `copy-guide.html` | دليل استخدام نصي قابل للنسخ للجوال |
 | `STATUS.txt`, `copy-summary.html` | ملخص حالة قابل للنسخ |
 | `AGENT-BRIEF*` | وثائق الوكيل (سياق التطوير الكامل) |

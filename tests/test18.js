@@ -1,7 +1,9 @@
 const fs=require('fs');
+const path=require('path');
 const {JSDOM}=require('jsdom');
-const html=fs.readFileSync('/home/user/dafter/index.html','utf8');
-const xlsxLib=fs.readFileSync('/home/user/dafter/lib/xlsx.full.min.js','utf8');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const xlsxLib=fs.readFileSync(path.join(root,'lib/xlsx.full.min.js'),'utf8');
 const store={};
 const vc=new (require('jsdom').VirtualConsole)();
 vc.on('jsdomError',e=>{if(!/scrollTo/.test(e.message))console.log('JSDOM-ERR:',e.message)});
