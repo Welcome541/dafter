@@ -7,6 +7,7 @@ const w=boot(),d=w.document;const {ok,done}=mk();
  w.eval('ui.whisperOpen=true;render()');await wait(30);
  const input=d.getElementById('whisperModelFile');
  ok(!!input&&input.accept.includes('.bin'),'model picker accepts .bin files');
+ ok(/الملفات/.test(d.getElementById('app').textContent)&&/بلا إنترنت/.test(d.getElementById('app').textContent),'Settings explains local Files import and offline use');
  w.eval("window.whisperEngine={hasModel:false,ready:false,modelName:'',modelSize:0,formatBytes:n=>Math.round(n/1048576)+' MB',importModel:async f=>{window.__importedName=f.name;window.whisperEngine.hasModel=true;window.whisperEngine.ready=true;return true},prepare:async()=>true,removeModel:async()=>true,start:(k,c,l)=>Promise.resolve('أبو خالد 50 رز'),stop:async()=>{},cancel:()=>{}};");
  await w.eval("importWhisperModel({files:[{name:'ggml-tiny.bin'}],value:'test'})");await wait(40);
  ok(w.eval("window.__importedName==='ggml-tiny.bin'&&sec.whisper===true"),'successful import enables Whisper');

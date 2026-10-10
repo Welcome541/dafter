@@ -1,0 +1,64 @@
+name: Build offline Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build installable APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        working-directory: android-offline
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Verify no Internet permission and stage APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android-offline/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee /tmp/dafter-apk-permissions.txt
+          if grep -q 'android.permission.INTERNET' /tmp/dafter-apk-permissions.txt; then
+            echo 'The offline APK must not request INTERNET permission.' >&2
+            exit 1
+          fi
+          cp "$apk" Dafter-Whisper-Offline.apk
+          sha256sum Dafter-Whisper-Offline.apk > Dafter-Whisper-Offline.apk.sha256
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dafter-Whisper-Offline
+          path: |
+            Dafter-Whisper-Offline.apk
+            Dafter-Whisper-Offline.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

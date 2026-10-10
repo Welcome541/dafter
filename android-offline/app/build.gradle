@@ -2,6 +2,23 @@ plugins {
     id 'com.android.application'
 }
 
+// The web app remains the single source of truth. Copy its offline shell and
+// bundled libraries into the APK before Android packages the assets.
+def webAppRoot = rootProject.projectDir.parentFile
+def offlineWebAssets = layout.projectDirectory.dir('src/main/assets/www')
+tasks.register('syncOfflineWebAssets', Sync) {
+    from(webAppRoot) {
+        include 'index.html'
+        include 'manifest.webmanifest'
+        include 'icon512.png'
+        include 'lib/**'
+    }
+    into offlineWebAssets
+}
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('syncOfflineWebAssets')
+}
+
 def signingFile = rootProject.file('signing.local.properties')
 def signingProps = new Properties()
 if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
