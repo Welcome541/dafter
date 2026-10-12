@@ -20,6 +20,6 @@ ok(/Cross-Origin-Opener-Policy/.test(activity)&&/Cross-Origin-Embedder-Policy/.t
 ok(/id="whisperModelFile" type="file" accept="\.bin,application\/octet-stream"/.test(androidHtml),'Android settings exposes a .bin model picker');
 ok(/importWhisperModel\(input\)[\s\S]*?whisperEngine\.importModel\(f\)/.test(androidHtml),'selected model file is stored locally through the Whisper engine');
 ok(/assembleDebug/.test(buildScript)&&/Dafter-Whisper-Offline\.apk/.test(buildScript),'one command builds a phone-installable APK');
-ok(/actions\/upload-artifact@v4/.test(workflow)&&/Dafter-Whisper-Offline\.apk/.test(workflow),'CI publishes the APK as a downloadable artifact');
+ok(/actions\/upload-artifact@v5/.test(workflow)&&/Dafter-Whisper-Offline\.apk/.test(workflow),'CI publishes the APK as a downloadable artifact');
 
 done();

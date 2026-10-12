@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -122,24 +123,27 @@ public final class MainActivity extends Activity {
             request.deny();
             return;
         }
-        boolean audioOnly = true;
-        for (String resource : request.getResources()) {
+        String[] resources = request.getResources();
+        boolean audioOnly = resources.length == 1;
+        for (String resource : resources) {
             if (!PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) audioOnly = false;
         }
         if (!audioOnly) {
             request.deny();
             return;
         }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+        if (checkCallingOrSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
-        } else {
+        } else if (Build.VERSION.SDK_INT >= 23) {
             pendingPermission = request;
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MIC);
+        } else {
+            request.deny();
         }
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (Build.VERSION.SDK_INT < 23) return;
         if (requestCode == REQUEST_MIC && pendingPermission != null) {
             PermissionRequest request = pendingPermission;
             pendingPermission = null;

@@ -1,0 +1,440 @@
+/* Responsive sizing layer for Daftari — local/offline stylesheet. */
+:root {
+  --content-max: 1040px;
+  --wide-max: 1180px;
+  --dock-max: 780px;
+  --ui-gutter: 16px;
+  --icon-size: 22px;
+}
+
+html {
+  zoom: 1 !important;
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  background: var(--bg);
+  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+}
+
+body[lang="ar"] {
+  font-family: system-ui, "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+
+body[lang="en"] {
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+#phone {
+  width: 100%;
+  max-width: var(--wide-max);
+  min-height: 100vh;
+  min-height: 100svh;
+  margin-inline: auto;
+  overflow-x: hidden;
+  box-shadow: none;
+}
+
+#app {
+  width: 100%;
+  min-width: 0;
+  flex: 1 0 auto;
+}
+
+#app > .pad,
+#app > .list,
+#app > .grid2 {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+
+.pad {
+  min-width: 0;
+  padding-inline: clamp(12px, 3vw, 28px);
+}
+
+.hdr {
+  width: 100%;
+  max-width: var(--wide-max);
+  min-width: 0;
+  margin-inline: auto;
+  padding-inline: clamp(12px, 2.6vw, 28px);
+}
+
+.hdr h1 {
+  min-width: 0;
+  font-size: clamp(16px, 1.6vw, 20px);
+  line-height: 1.25;
+}
+
+.logo-ic {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.card,
+.litem,
+.srow,
+.stat,
+.inv,
+.kv,
+.search,
+.row {
+  min-width: 0;
+}
+
+.stat {
+  padding: clamp(11px, 1.5vw, 18px);
+}
+
+.stat .t {
+  min-width: 0;
+  font-size: clamp(11px, 1.1vw, 13px);
+  line-height: 1.35;
+}
+
+.stat .v {
+  min-width: 0;
+  font-size: clamp(16px, 1.8vw, 23px);
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.stat .v .num,
+.amt .num {
+  white-space: nowrap;
+}
+
+.btn {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px clamp(12px, 1.6vw, 18px);
+  gap: clamp(6px, 1vw, 10px);
+  font-size: clamp(14px, 1.25vw, 16px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.hbtn {
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.inp,
+.search .inp,
+.search .inp input {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 16px;
+}
+
+.litem {
+  gap: clamp(8px, 1.2vw, 12px);
+  padding: clamp(10px, 1.3vw, 14px);
+}
+
+.litem > .sp,
+.litem .sp {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.amt {
+  max-width: 48%;
+  font-size: clamp(13px, 1.2vw, 15px);
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+.srow {
+  gap: clamp(9px, 1.4vw, 14px);
+  padding: clamp(11px, 1.5vw, 16px);
+}
+
+.srow .sic2 {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+}
+
+.kic {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+}
+
+.kv {
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.kv .k {
+  min-width: 0;
+  font-size: clamp(12px, 1.15vw, 14px);
+}
+
+.kv .v {
+  max-width: 58%;
+  overflow-wrap: anywhere;
+  font-size: clamp(13px, 1.25vw, 15px);
+}
+
+.chips {
+  max-width: 100%;
+}
+
+.chips button,
+.chip,
+.pchip,
+.seg button,
+.langsw button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Keep every interface icon legible but prevent oversized inline SVGs. */
+svg {
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+svg.ic {
+  width: 22px !important;
+  height: 22px !important;
+  flex: 0 0 auto;
+}
+
+.hbtn svg.ic,
+.logo-ic svg.ic,
+.srow .sic2 svg.ic,
+.kic svg.ic {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+#tabbar svg.ic {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.micwrap {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(12px, 3vw, 22px) 12px 8px;
+}
+
+.mic {
+  width: 104px;
+  height: 104px;
+  width: clamp(88px, 12vw, 108px);
+  height: clamp(88px, 12vw, 108px);
+  flex: 0 0 auto;
+}
+
+.mic svg.ic {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.wave {
+  max-width: 100%;
+  height: 34px;
+  gap: 3px;
+}
+
+.transcript {
+  max-width: 100%;
+  border-radius: 14px;
+  line-height: 1.55;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.kp {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 250px;
+  max-width: 100%;
+  width: min(100%, 250px);
+  gap: clamp(8px, 2vw, 14px);
+  margin-inline: auto;
+}
+
+.kp button {
+  width: 100%;
+  height: 64px;
+  height: clamp(56px, 9vw, 68px);
+  font-size: clamp(20px, 4vw, 24px);
+}
+
+.okc {
+  width: 76px;
+  height: 76px;
+}
+
+#sheet {
+  width: 100%;
+  max-width: 760px;
+  max-height: 88vh;
+  max-height: 88svh;
+  padding: 10px clamp(14px, 3vw, 24px) calc(16px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
+}
+
+#sheet table,
+#app table {
+  max-width: 100%;
+}
+
+#toast {
+  width: calc(100% - 24px);
+  max-width: 460px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  overflow-wrap: anywhere;
+}
+
+#tabbar {
+  width: 100%;
+  max-width: var(--dock-max);
+  height: calc(68px + env(safe-area-inset-bottom));
+  margin-inline: auto;
+  padding-inline: clamp(2px, 1vw, 10px);
+}
+
+#tabbar button {
+  min-width: 0;
+  min-height: 64px;
+  gap: 3px;
+  padding: 2px 1px;
+  font-size: clamp(10px, 1vw, 12px);
+  line-height: 1.2;
+}
+
+#tabbar .tbind {
+  width: 44px;
+  height: 28px;
+}
+
+#tabbar .tabplus {
+  width: 50px;
+  height: 50px;
+  transform: translateY(-8px);
+}
+
+#tabbar .tabplus:active {
+  transform: translateY(-8px) scale(.94);
+}
+
+#actionrow {
+  width: 100%;
+  max-width: var(--dock-max);
+  margin-inline: auto;
+  bottom: calc(68px + env(safe-area-inset-bottom));
+  gap: 8px;
+  padding: 6px clamp(8px, 1.5vw, 16px);
+}
+
+#actionrow .btn {
+  min-width: 0;
+  min-height: 48px;
+  height: 56px;
+  height: clamp(48px, 7vh, 58px);
+  padding: 8px 10px;
+  gap: 7px;
+  font-size: clamp(13px, 1.2vw, 16px);
+}
+
+#actionrow .btn svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+#clist2,
+#txlist {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom)) !important;
+}
+
+.fab2 {
+  width: 50px;
+  height: 50px;
+}
+
+#fabAdd {
+  inset-inline-end: clamp(12px, 3vw, 24px);
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  width: 50px;
+  height: 50px;
+}
+
+.sbar {
+  padding: 10px clamp(14px, 3vw, 22px) 2px;
+  font-size: 13px;
+}
+
+.sbar svg {
+  width: auto;
+  height: 12px;
+}
+
+@media (max-width: 380px) {
+  :root { --ui-gutter: 12px; }
+  .pad { padding-inline: 12px; }
+  .hdr { gap: 7px; padding-inline: 10px; }
+  .stats { gap: 8px; }
+  .stat { padding: 10px; }
+  .stat .v { font-size: 15px; }
+  .stat .t { font-size: 11px; }
+  .litem { padding: 9px; }
+  .amt { max-width: 45%; }
+  #actionrow { gap: 6px; padding-inline: 7px; }
+  #actionrow .btn { padding-inline: 6px; font-size: 12.5px; }
+}
+
+@media (min-width: 768px) {
+  body { background: #e7e3db; }
+  #phone {
+    min-height: 100vh;
+    box-shadow: 0 0 0 1px #d8d2c6, 0 12px 40px rgba(0,0,0,.1);
+  }
+  .sbar { display: none; }
+  .pad { padding-inline: clamp(20px, 3vw, 36px); }
+  .stats { gap: clamp(14px, 2vw, 22px); }
+  .mic { width: 108px; height: 108px; }
+  #tabbar { border-radius: 18px 18px 0 0; }
+}
+
+@media (min-width: 1100px) {
+  #app > .pad,
+  #app > .list,
+  #app > .grid2 { max-width: 1080px; }
+  .pad { padding-inline: 32px; }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .sbar { display: none; }
+  .hdr { padding-block: 4px; }
+  #tabbar { height: calc(58px + env(safe-area-inset-bottom)); }
+  #tabbar button { min-height: 54px; }
+  #actionrow { bottom: calc(58px + env(safe-area-inset-bottom)); }
+  .micwrap { padding-top: 8px; }
+  .mic { width: 76px; height: 76px; }
+  .mic svg.ic { width: 38px !important; height: 38px !important; }
+  .wave { height: 24px; margin-block: 8px 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #tabbar *, #actionrow *, .mic.live { animation: none !important; transition: none !important; }
+}
