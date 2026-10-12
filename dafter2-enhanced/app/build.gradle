@@ -14,8 +14,8 @@ android {
         applicationId 'ai.arena.dafter.enhanced'
         minSdk 21
         targetSdk 34
-        versionCode 221
-        versionName '2.21-dafter2-whisper-offline'
+        versionCode 222
+        versionName '2.22-responsive-offline'
     }
 
     compileOptions {
