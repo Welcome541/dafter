@@ -20,6 +20,7 @@ import android.webkit.WebViewClient;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public final class MainActivity extends Activity {
@@ -50,9 +51,20 @@ public final class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return request.isForMainFrame() && !isAppAssetUri(request.getUrl());
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return !isAppAssetUri(Uri.parse(url));
+            }
+
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (!APP_HOST.equals(uri.getHost())) return null;
+                String scheme = uri.getScheme();
+                if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return null;
+                if (!isAppAssetUri(uri)) return blockedOfflineRequest();
                 return serveAsset(uri.getPath());
             }
         });
@@ -62,12 +74,15 @@ public final class MainActivity extends Activity {
                 fileCallback = callback;
                 try {
                     Intent intent = params.createIntent();
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    if (isModelFileChooser(params)) intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
                     startActivityForResult(intent, PICK_FILE);
                     return true;
                 } catch (Exception e) {
                     fileCallback = null;
                     callback.onReceiveValue(null);
-                    return false;
+                    return true;
                 }
             }
 
@@ -83,10 +98,34 @@ public final class MainActivity extends Activity {
         webView.loadUrl("https://" + APP_HOST + "/assets/www/index.html");
     }
 
+    private static boolean isAppAssetUri(Uri uri) {
+        if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
+        if (!APP_HOST.equalsIgnoreCase(uri.getHost())) return false;
+        return uri.getPort() == -1 || uri.getPort() == 443;
+    }
+
+    private static boolean isModelFileChooser(WebChromeClient.FileChooserParams params) {
+        if (params == null || params.getAcceptTypes() == null) return false;
+        for (String acceptType : params.getAcceptTypes()) {
+            if (acceptType == null) continue;
+            String type = acceptType.toLowerCase(Locale.ROOT);
+            if (type.contains(".bin") || type.equals("application/octet-stream")) return true;
+        }
+        return false;
+    }
+
+    private WebResourceResponse blockedOfflineRequest() {
+        return response(403, "Offline", "text/plain", new ByteArrayInputStream(new byte[0]));
+    }
+
     private void handleWebPermission(PermissionRequest request) {
+        if (!isAppAssetUri(request.getOrigin())) {
+            request.deny();
+            return;
+        }
         String[] resources = request.getResources();
         boolean audioOnly = resources.length == 1;
-        for (String resource : request.getResources()) {
+        for (String resource : resources) {
             if (!PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) audioOnly = false;
         }
         if (!audioOnly) {
